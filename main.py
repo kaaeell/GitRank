@@ -10,7 +10,7 @@ if not username:
 else:
     url = f"https://api.github.com/users/{username}"
     print(f"\nLooking up {username} on GitHub...")
-    time.sleep(0.5)  # Tiny pause for effect
+    time.sleep(0.5)
     
     response = requests.get(url)
 
@@ -54,7 +54,6 @@ else:
         hireable = "Yes" if data['hireable'] else "No"
         print(f"Open to hiring:  {hireable}")
         
-        # Little extra: show if profile is complete
         profile_fields = [data['name'], data['bio'], data['location'], data['company']]
         filled_fields = sum(1 for field in profile_fields if field)
         completeness = int((filled_fields / 4) * 100)
@@ -90,7 +89,6 @@ else:
                             desc = desc[:60] + "..."
                         print(f"   Description: {desc}")
                     
-                    # Show if it was recently updated
                     updated = datetime.strptime(repo['updated_at'], "%Y-%m-%dT%H:%M:%SZ")
                     days_since = (datetime.now() - updated).days
                     if days_since == 0:
@@ -106,10 +104,34 @@ else:
         else:
             print("Hmm, couldn't fetch their repository data at the moment.")
             print("The GitHub API might be a bit slow right now.")
+            
+        # Little extra for today: random GitHub fact
+        import random
+        facts = [
+            "GitHub was launched in 2008.",
+            "The name 'GitHub' combines 'Git' and 'hub'.",
+            "GitHub has over 100 million developers worldwide.",
+            "The first GitHub repository was octocat/Spoon-Knife.",
+            "GitHub was acquired by Microsoft in 2018.",
+            "The most starred repository on GitHub is freeCodeCamp.",
+            "GitHub uses the Octocat as its mascot.",
+            "GitHub hosts over 200 million repositories."
+        ]
+        print("\n" + "=" * 44)
+        print(f"Did you know? {random.choice(facts)}")
+        print("=" * 44)
 
     elif response.status_code == 404:
         print(f"Sorry, I couldn't find a GitHub user named '{username}'. Are you sure that's correct?")
         print("Check for typos or try a different username.")
+        
+        # Suggest checking popular users
+        print("\nPopular GitHub users to try:")
+        print("  - octocat")
+        print("  - torvalds")
+        print("  - google")
+        print("  - microsoft")
+        print("  - facebook")
 
     else:
         print(f"Oops, something went wrong. The server returned status code: {response.status_code}.")
