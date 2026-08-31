@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime
 import time
+import random
 
 print("Hello! Let me fetch a GitHub profile for you.")
 username = input("Enter GitHub username: ")
@@ -59,6 +60,14 @@ else:
         completeness = int((filled_fields / 4) * 100)
         print(f"Profile complete: {completeness}%")
         
+        # Check if account is recent
+        if days_old < 30:
+            print("Status:          New to GitHub! Welcome!")
+        elif days_old < 365:
+            print("Status:          Active community member")
+        else:
+            print("Status:          Seasoned GitHub veteran")
+        
         print("=" * 44)
         
         # Let's also check out their recent work
@@ -73,21 +82,35 @@ else:
             
             if repos:
                 total_stars = sum(repo['stargazers_count'] for repo in repos)
-                print(f"\nHere are their 3 most recently updated projects (total stars: {total_stars}):\n")
+                total_forks = sum(repo['forks_count'] for repo in repos)
+                languages_used = set(repo['language'] for repo in repos if repo['language'])
+                
+                print(f"\nHere are their 3 most recently updated projects:")
+                print(f"   Total stars across these: {total_stars}")
+                print(f"   Total forks across these: {total_forks}")
+                if languages_used:
+                    print(f"   Languages used: {', '.join(languages_used)}")
+                print()
                 
                 for i, repo in enumerate(repos, 1):
                     stars = repo['stargazers_count']
                     forks = repo['forks_count']
                     language = repo['language'] or "Not specified"
+                    watchers = repo['watchers_count']
                     
                     print(f"Project {i}: {repo['name']}")
-                    print(f"   Stars: {stars}   Forks: {forks}   Language: {language}")
+                    print(f"   Stars: {stars}   Forks: {forks}   Watchers: {watchers}")
+                    print(f"   Language: {language}")
                     
                     if repo['description']:
                         desc = repo['description']
                         if len(desc) > 60:
                             desc = desc[:60] + "..."
                         print(f"   Description: {desc}")
+                    
+                    # Check if repo has issues
+                    if repo['open_issues_count'] > 0:
+                        print(f"   Open issues: {repo['open_issues_count']}")
                     
                     updated = datetime.strptime(repo['updated_at'], "%Y-%m-%dT%H:%M:%SZ")
                     days_since = (datetime.now() - updated).days
@@ -105,8 +128,17 @@ else:
             print("Hmm, couldn't fetch their repository data at the moment.")
             print("The GitHub API might be a bit slow right now.")
             
-        # Little extra for today: random GitHub fact
-        import random
+        # Check follower-to-following ratio
+        if data['followers'] > 0 and data['following'] > 0:
+            ratio = data['followers'] / data['following']
+            if ratio > 10:
+                print("Note: This user has many more followers than they follow.")
+                print("      They might be quite popular or influential!")
+            elif ratio < 0.1:
+                print("Note: This user follows many more people than follow them.")
+                print("      They might be new or very active in following others.")
+        
+        # Random GitHub fact
         facts = [
             "GitHub was launched in 2008.",
             "The name 'GitHub' combines 'Git' and 'hub'.",
@@ -115,7 +147,9 @@ else:
             "GitHub was acquired by Microsoft in 2018.",
             "The most starred repository on GitHub is freeCodeCamp.",
             "GitHub uses the Octocat as its mascot.",
-            "GitHub hosts over 200 million repositories."
+            "GitHub hosts over 200 million repositories.",
+            "The most forked repository on GitHub is FirstContributions.",
+            "GitHub Actions was introduced in 2019."
         ]
         print("\n" + "=" * 44)
         print(f"Did you know? {random.choice(facts)}")
@@ -125,17 +159,22 @@ else:
         print(f"Sorry, I couldn't find a GitHub user named '{username}'. Are you sure that's correct?")
         print("Check for typos or try a different username.")
         
-        # Suggest checking popular users
         print("\nPopular GitHub users to try:")
-        print("  - octocat")
-        print("  - torvalds")
-        print("  - google")
-        print("  - microsoft")
-        print("  - facebook")
+        popular_users = ["octocat", "torvalds", "google", "microsoft", "facebook", "twitter", "angular", "reactjs", "vuejs"]
+        for user in popular_users[:5]:
+            print(f"  - {user}")
+        
+        print("\nTip: You can also try searching for organizations or teams!")
 
     else:
         print(f"Oops, something went wrong. The server returned status code: {response.status_code}.")
         print("This might be a temporary issue. Please try again in a moment.")
+        
+        # Show what status codes mean
+        if response.status_code == 403:
+            print("Note: Rate limit exceeded. Wait a moment and try again.")
+        elif response.status_code == 500:
+            print("Note: GitHub's servers might be experiencing issues.")
 
 print("\nThanks for using the GitHub profile viewer!")
 print("Have a great day!")
