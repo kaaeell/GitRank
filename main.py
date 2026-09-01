@@ -31,6 +31,9 @@ else:
         print(f"Public repos:    {data['public_repos']}")
         print(f"Public gists:    {data['public_gists']}")
         
+        # Added: profile link
+        print(f"Profile:         {data['html_url']}")
+        
         created_at = datetime.strptime(data['created_at'], "%Y-%m-%dT%H:%M:%SZ")
         print(f"Joined GitHub:   {created_at.strftime('%B %d, %Y')}")
         
@@ -60,6 +63,14 @@ else:
         completeness = int((filled_fields / 4) * 100)
         print(f"Profile complete: {completeness}%")
         
+        # Added: simple popularity check
+        if data['followers'] >= 1000:
+            print("Popularity:       🔥 Very popular")
+        elif data['followers'] >= 100:
+            print("Popularity:       ⭐ Growing developer")
+        else:
+            print("Popularity:       🌱 Still growing")
+        
         # Check if account is recent
         if days_old < 30:
             print("Status:          New to GitHub! Welcome!")
@@ -85,9 +96,14 @@ else:
                 total_forks = sum(repo['forks_count'] for repo in repos)
                 languages_used = set(repo['language'] for repo in repos if repo['language'])
                 
+                # Added: average stars
+                average_stars = total_stars / len(repos)
+                
                 print(f"\nHere are their 3 most recently updated projects:")
                 print(f"   Total stars across these: {total_stars}")
+                print(f"   Average stars: {average_stars:.1f}")
                 print(f"   Total forks across these: {total_forks}")
+                
                 if languages_used:
                     print(f"   Languages used: {', '.join(languages_used)}")
                 print()
@@ -102,11 +118,21 @@ else:
                     print(f"   Stars: {stars}   Forks: {forks}   Watchers: {watchers}")
                     print(f"   Language: {language}")
                     
+                    # Added: repo size
+                    print(f"   Size: {repo['size']} KB")
+                    
+                    # Added: visibility
+                    print(f"   Visibility: {repo['visibility']}")
+                    
                     if repo['description']:
                         desc = repo['description']
                         if len(desc) > 60:
                             desc = desc[:60] + "..."
                         print(f"   Description: {desc}")
+                    
+                    # Added: archived check
+                    if repo['archived']:
+                        print("   Status: ARCHIVED")
                     
                     # Check if repo has issues
                     if repo['open_issues_count'] > 0:
@@ -151,6 +177,7 @@ else:
             "The most forked repository on GitHub is FirstContributions.",
             "GitHub Actions was introduced in 2019."
         ]
+        
         print("\n" + "=" * 44)
         print(f"Did you know? {random.choice(facts)}")
         print("=" * 44)
@@ -170,7 +197,6 @@ else:
         print(f"Oops, something went wrong. The server returned status code: {response.status_code}.")
         print("This might be a temporary issue. Please try again in a moment.")
         
-        # Show what status codes mean
         if response.status_code == 403:
             print("Note: Rate limit exceeded. Wait a moment and try again.")
         elif response.status_code == 500:
