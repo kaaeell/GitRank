@@ -30,13 +30,14 @@ else:
         print(f"Following:       {data['following']}")
         print(f"Public repos:    {data['public_repos']}")
         print(f"Public gists:    {data['public_gists']}")
-        
-        # Added: profile link
         print(f"Profile:         {data['html_url']}")
-        
+
         created_at = datetime.strptime(data['created_at'], "%Y-%m-%dT%H:%M:%SZ")
         print(f"Joined GitHub:   {created_at.strftime('%B %d, %Y')}")
         
+        # Small addition: account creation year
+        print(f"Joined in:       {created_at.year}")
+
         days_old = (datetime.now() - created_at).days
         years = days_old // 365
         months = (days_old % 365) // 30
@@ -62,16 +63,17 @@ else:
         filled_fields = sum(1 for field in profile_fields if field)
         completeness = int((filled_fields / 4) * 100)
         print(f"Profile complete: {completeness}%")
-        
-        # Added: simple popularity check
-        if data['followers'] >= 1000:
-            print("Popularity:       🔥 Very popular")
-        elif data['followers'] >= 100:
-            print("Popularity:       ⭐ Growing developer")
+
+        # Small addition: simple activity description
+        if data['public_repos'] == 0:
+            print("Activity:         No public repositories")
+        elif data['public_repos'] < 5:
+            print("Activity:         Getting started")
+        elif data['public_repos'] < 20:
+            print("Activity:         Building a portfolio")
         else:
-            print("Popularity:       🌱 Still growing")
+            print("Activity:         Very active portfolio")
         
-        # Check if account is recent
         if days_old < 30:
             print("Status:          New to GitHub! Welcome!")
         elif days_old < 365:
@@ -81,7 +83,6 @@ else:
         
         print("=" * 44)
         
-        # Let's also check out their recent work
         print("\nChecking their latest repositories...")
         time.sleep(0.3)
         
@@ -96,14 +97,14 @@ else:
                 total_forks = sum(repo['forks_count'] for repo in repos)
                 languages_used = set(repo['language'] for repo in repos if repo['language'])
                 
-                # Added: average stars
-                average_stars = total_stars / len(repos)
-                
                 print(f"\nHere are their 3 most recently updated projects:")
                 print(f"   Total stars across these: {total_stars}")
-                print(f"   Average stars: {average_stars:.1f}")
                 print(f"   Total forks across these: {total_forks}")
                 
+                # Small addition: average stars
+                average_stars = total_stars / len(repos)
+                print(f"   Average stars: {average_stars:.1f}")
+
                 if languages_used:
                     print(f"   Languages used: {', '.join(languages_used)}")
                 print()
@@ -118,38 +119,40 @@ else:
                     print(f"   Stars: {stars}   Forks: {forks}   Watchers: {watchers}")
                     print(f"   Language: {language}")
                     
-                    # Added: repo size
+                    # Small addition: repository size
                     print(f"   Size: {repo['size']} KB")
-                    
-                    # Added: visibility
-                    print(f"   Visibility: {repo['visibility']}")
-                    
+
                     if repo['description']:
                         desc = repo['description']
                         if len(desc) > 60:
                             desc = desc[:60] + "..."
                         print(f"   Description: {desc}")
                     
-                    # Added: archived check
+                    # Small addition: archived status
                     if repo['archived']:
                         print("   Status: ARCHIVED")
+                    else:
+                        print("   Status: Active")
                     
-                    # Check if repo has issues
                     if repo['open_issues_count'] > 0:
                         print(f"   Open issues: {repo['open_issues_count']}")
                     
                     updated = datetime.strptime(repo['updated_at'], "%Y-%m-%dT%H:%M:%SZ")
                     days_since = (datetime.now() - updated).days
+
                     if days_since == 0:
                         print(f"   Updated: today!")
                     elif days_since == 1:
                         print(f"   Updated: yesterday")
                     else:
                         print(f"   Updated: {days_since} days ago")
+
                     print()
+
             else:
                 print("This user doesn't have any public repositories yet.")
                 print("Maybe they're new to GitHub or prefer to keep things private.")
+
         else:
             print("Hmm, couldn't fetch their repository data at the moment.")
             print("The GitHub API might be a bit slow right now.")
@@ -157,13 +160,23 @@ else:
         # Check follower-to-following ratio
         if data['followers'] > 0 and data['following'] > 0:
             ratio = data['followers'] / data['following']
+
             if ratio > 10:
                 print("Note: This user has many more followers than they follow.")
                 print("      They might be quite popular or influential!")
+
             elif ratio < 0.1:
                 print("Note: This user follows many more people than follow them.")
                 print("      They might be new or very active in following others.")
-        
+
+        # Small addition: follower category
+        if data['followers'] >= 1000:
+            print("🔥 Popular GitHub profile!")
+        elif data['followers'] >= 100:
+            print("⭐ Growing GitHub profile!")
+        else:
+            print("🌱 Still building their GitHub audience.")
+
         # Random GitHub fact
         facts = [
             "GitHub was launched in 2008.",
@@ -177,7 +190,7 @@ else:
             "The most forked repository on GitHub is FirstContributions.",
             "GitHub Actions was introduced in 2019."
         ]
-        
+
         print("\n" + "=" * 44)
         print(f"Did you know? {random.choice(facts)}")
         print("=" * 44)
@@ -188,9 +201,10 @@ else:
         
         print("\nPopular GitHub users to try:")
         popular_users = ["octocat", "torvalds", "google", "microsoft", "facebook", "twitter", "angular", "reactjs", "vuejs"]
+
         for user in popular_users[:5]:
             print(f"  - {user}")
-        
+
         print("\nTip: You can also try searching for organizations or teams!")
 
     else:
