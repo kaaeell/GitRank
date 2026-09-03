@@ -81,6 +81,10 @@ else:
         else:
             print("Status:          Seasoned GitHub veteran")
         
+        # Small addition: day of week they joined
+        joined_day = created_at.strftime('%A')
+        print(f"Joined on a:     {joined_day}")
+        
         print("=" * 44)
         
         print("\nChecking their latest repositories...")
@@ -120,7 +124,8 @@ else:
                     print(f"   Language: {language}")
                     
                     # Small addition: repository size
-                    print(f"   Size: {repo['size']} KB")
+                    size_mb = repo['size'] / 1024
+                    print(f"   Size: {size_mb:.2f} MB")
 
                     if repo['description']:
                         desc = repo['description']
@@ -133,6 +138,12 @@ else:
                         print("   Status: ARCHIVED")
                     else:
                         print("   Status: Active")
+                    
+                    # Small addition: private repo check
+                    if repo['private']:
+                        print("   Visibility: Private")
+                    else:
+                        print("   Visibility: Public")
                     
                     if repo['open_issues_count'] > 0:
                         print(f"   Open issues: {repo['open_issues_count']}")
@@ -176,6 +187,16 @@ else:
             print("⭐ Growing GitHub profile!")
         else:
             print("🌱 Still building their GitHub audience.")
+        
+        # Small addition: average repos per year
+        if years > 0:
+            repos_per_year = data['public_repos'] / years
+            if repos_per_year > 20:
+                print(f"📊 Very productive: {repos_per_year:.1f} repos per year")
+            elif repos_per_year > 5:
+                print(f"📊 Moderately productive: {repos_per_year:.1f} repos per year")
+            else:
+                print(f"📊 Taking it slow: {repos_per_year:.1f} repos per year")
 
         # Random GitHub fact
         facts = [
@@ -188,7 +209,9 @@ else:
             "GitHub uses the Octocat as its mascot.",
             "GitHub hosts over 200 million repositories.",
             "The most forked repository on GitHub is FirstContributions.",
-            "GitHub Actions was introduced in 2019."
+            "GitHub Actions was introduced in 2019.",
+            "The Octocat has over 20 different versions.",
+            "GitHub's logo was designed in 2014."
         ]
 
         print("\n" + "=" * 44)
