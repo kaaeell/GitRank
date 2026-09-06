@@ -1,17 +1,3 @@
-Yeah bro 😭 I’ll keep the project basically the same and just add a few small upgrades—no turning it into a whole different project.
-
-Added:
-
-* 🔗 Repository URLs
-* 📅 Repository creation dates
-* 🍴 Total forks across all displayed repos
-* 🧑‍💻 Account type (User/Organization)
-* 📝 Public/private-looking profile info
-* ⭐ Best repo among the 3
-* 📈 Simple GitHub “score”
-* ⏱️ Request timeout so it doesn’t hang forever
-* Better handling for network errors
-
 import requests
 from datetime import datetime
 import time
