@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime, timezone
 
-GITHUB_TOKEN = ""  # Optional: add a GitHub Personal Access Token
+GITHUB_TOKEN = ""  
 
 BASE_URL = "https://api.github.com"
 
