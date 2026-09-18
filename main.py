@@ -1,14 +1,11 @@
 import os
-import requests
 from datetime import datetime, timezone
+import requests
 
 API = "https://api.github.com"
 TOKEN = os.getenv("GITHUB_TOKEN", "")
 
-HEADERS = {
-    "Accept": "application/vnd.github+json",
-    "User-Agent": "GitRank"
-}
+HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": "GitRank"}
 
 if TOKEN:
     HEADERS["Authorization"] = f"Bearer {TOKEN}"
@@ -16,14 +13,10 @@ if TOKEN:
 
 # ---------------- API ----------------
 
+
 def get(url, params=None):
     try:
-        r = requests.get(
-            url,
-            headers=HEADERS,
-            params=params,
-            timeout=10
-        )
+        r = requests.get(url, headers=HEADERS, params=params, timeout=10)
 
         if r.status_code == 200:
             return r.json()
@@ -46,16 +39,13 @@ def date(text):
         return None
 
     try:
-        return datetime.fromisoformat(
-            text.replace("Z", "+00:00")
-        )
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         return None
 
 
 def age(text):
     d = date(text)
-
     if not d:
         return None
 
@@ -63,6 +53,7 @@ def age(text):
 
 
 # ---------------- GitHub ----------------
+
 
 def profile(username):
     return get(f"{API}/users/{username}")
@@ -75,11 +66,7 @@ def repos(username):
     while True:
         data = get(
             f"{API}/users/{username}/repos",
-            {
-                "per_page": 100,
-                "page": page,
-                "sort": "updated"
-            }
+            {"per_page": 100, "page": page, "sort": "updated"},
         )
 
         if data is None:
@@ -100,6 +87,7 @@ def repos(username):
 
 # ---------------- Analysis ----------------
 
+
 def analyze(rs):
     stats = {
         "stars": 0,
@@ -110,7 +98,7 @@ def analyze(rs):
         "original": 0,
         "archived": 0,
         "stale": 0,
-        "languages": {}
+        "languages": {},
     }
 
     for r in rs:
@@ -139,9 +127,7 @@ def analyze(rs):
         lang = r.get("language")
 
         if lang:
-            stats["languages"][lang] = (
-                stats["languages"].get(lang, 0) + 1
-            )
+            stats["languages"][lang] = stats["languages"].get(lang, 0) + 1
 
     return stats
 
@@ -189,47 +175,35 @@ def completeness(p):
         p.get("bio"),
         p.get("location"),
         p.get("blog"),
-        p.get("company")
+        p.get("company"),
     ]
 
-    return round(
-        sum(bool(x) for x in fields)
-        / len(fields) * 100
-    )
+    return round(sum(bool(x) for x in fields) / len(fields) * 100)
 
 
-def portfolio_score(p, s):
-    total = len(repos_cache)
+def portfolio_score(p, s, rs):
+    total = len(rs)
 
     if not total:
         return 0
 
-    activity = min(
-        s["active30"] / total * 100,
-        100
-    )
-
-    original = (
-        s["original"] / total * 100
-    )
-
-    long_activity = min(
-        s["active180"] * 5,
-        100
-    )
+    activity = min(s["active30"] / total * 100, 100)
+    original = s["original"] / total * 100
+    long_activity = min(s["active180"] * 5, 100)
 
     return round(
-        completeness(p) * .20 +
-        activity * .20 +
-        original * .20 +
-        long_activity * .20 +
-        min(s["stars"], 100) * .10 +
-        min(p.get("followers", 0), 100) * .10,
-        1
+        completeness(p) * 0.20
+        + activity * 0.20
+        + original * 0.20
+        + long_activity * 0.20
+        + min(s["stars"], 100) * 0.10
+        + min(p.get("followers", 0), 100) * 0.10,
+        1,
     )
 
 
 # ---------------- Display ----------------
+
 
 def show(p, rs, s):
     print("\n" + "=" * 50)
@@ -254,46 +228,39 @@ def show(p, rs, s):
     print("\n💻 LANGUAGES")
 
     for lang, count in sorted(
-        s["languages"].items(),
-        key=lambda x: x[1],
-        reverse=True
+        s["languages"].items(), key=lambda x: x[1], reverse=True
     ):
         print(f"  {lang}: {count}")
 
     print("\n🏆 TOP PROJECTS")
 
-    for i, r in enumerate(
-        sorted(
-            rs,
-            key=repo_score,
-            reverse=True
-        )[:5],
-        1
-    ):
+    sorted_repos = sorted(rs, key=repo_score, reverse=True)
+
+    for i, r in enumerate(sorted_repos[:5], 1):
         print(
             f"{i}. {r['name']} "
             f"({repo_score(r)}/100) "
             f"⭐{r.get('stargazers_count', 0)}"
         )
 
-    best = max(rs, key=repo_score) if rs else None
+    best = sorted_repos[0] if sorted_repos else None
 
     if best:
         print("\n🥇 BEST PROJECT")
         print(best["name"])
         print(best.get("html_url", ""))
 
-    score = portfolio_score(p, s)
+    score = portfolio_score(p, s, rs)
 
     print("\n🎯 GITRANK SCORE")
     print(f"{score}/100")
 
     xp = (
-        len(rs) * 25 +
-        s["original"] * 15 +
-        s["stars"] * 10 +
-        s["forks"] * 15 +
-        s["active30"] * 30
+        len(rs) * 25
+        + s["original"] * 15
+        + s["stars"] * 10
+        + s["forks"] * 15
+        + s["active30"] * 30
     )
 
     level = xp // 250 + 1
@@ -304,25 +271,17 @@ def show(p, rs, s):
 
 # ---------------- Search ----------------
 
-def search(rs):
-    q = input(
-        "\nSearch repository: "
-    ).lower().strip()
 
-    found = [
-        r for r in rs
-        if q in r["name"].lower()
-    ]
+def search(rs):
+    q = input("\nSearch repository: ").lower().strip()
+
+    found = [r for r in rs if q in r["name"].lower()]
 
     if not found:
         print("No results.")
         return
 
-    for r in sorted(
-        found,
-        key=repo_score,
-        reverse=True
-    ):
+    for r in sorted(found, key=repo_score, reverse=True):
         print(
             f"{r['name']} "
             f"| {repo_score(r)}/100 "
@@ -332,15 +291,9 @@ def search(rs):
 
 # ---------------- Main ----------------
 
-repos_cache = []
-
 
 def main():
-    global repos_cache
-
-    username = input(
-        "GitHub username: "
-    ).strip()
+    username = input("GitHub username: ").strip()
 
     if not username:
         print("❌ Username required.")
@@ -360,16 +313,10 @@ def main():
 
     s = analyze(repos_cache)
 
-    show(
-        p,
-        repos_cache,
-        s
-    )
+    show(p, repos_cache, s)
 
     while True:
-        choice = input(
-            "\nSearch repositories? (y/n): "
-        ).lower().strip()
+        choice = input("\nSearch repositories? (y/n): ").lower().strip()
 
         if choice == "y":
             search(repos_cache)
