@@ -5,49 +5,69 @@ import requests
 
 API_URL = "https://api.github.com"
 TOKEN = os.getenv("GITHUB_TOKEN", "")
+
 HEADERS = {
     "Accept": "application/vnd.github+json",
     "User-Agent": "GitRank",
-    **( {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {} )
+    **({"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}),
 }
 
 
-# ---------------- API Helper ----------------
+# ---------------- API Helpers ----------------
+
 
 def fetch_json(endpoint: str, params: dict = None):
+    """Fetches JSON data from GitHub API with error handling."""
     try:
-        r = requests.get(f"{API_URL}/{endpoint}", headers=HEADERS, params=params, timeout=10)
-        if r.status_code == 200:
-            return r.json()
-        
+        response = requests.get(
+            f"{API_URL}/{endpoint}", headers=HEADERS, params=params, timeout=10
+        )
+
+        if response.status_code == 200:
+            return response.json()
+
         errors = {
-            403: "❌ GitHub API rate limit hit or permission error.",
-            404: "❌ Requested resource not found."
+            403: "❌ GitHub API rate limit hit or authentication required.",
+            404: "❌ User or endpoint not found.",
         }
-        print(errors.get(r.status_code, f"❌ API error: {r.status_code}"))
+        print(errors.get(response.status_code, f"❌ API error: {response.status_code}"))
+
     except requests.RequestException as err:
         print(f"❌ Connection error: {err}")
+
     return None
 
 
 def fetch_all_repos(username: str):
+    """Fetches all public repositories for a user handling pagination."""
     repos, page = [], 1
+
     while True:
-        data = fetch_json(f"users/{username}/repos", {"per_page": 100, "page": page, "sort": "updated"})
+        data = fetch_json(
+            f"users/{username}/repos",
+            {"per_page": 100, "page": page, "sort": "updated"},
+        )
+
         if data is None:
             return None
         if not data:
             break
+
         repos.extend(data)
+
         if len(data) < 100:
             break
+
         page += 1
+
     return repos
 
 
-# ---------------- Scoring & Metrics ----------------
+# ---------------- Utility & Scoring ----------------
+
 
 def calculate_days_ago(iso_str: str) -> int | None:
+    """Calculates days elapsed since an ISO date string."""
     if not iso_str:
         return None
     try:
@@ -58,6 +78,7 @@ def calculate_days_ago(iso_str: str) -> int | None:
 
 
 def compute_repo_score(repo: dict, days_since_push: int | None) -> int:
+    """Calculates an individual repository quality score (0-100)."""
     score = (
         min(repo.get("stargazers_count", 0) * 2, 30)
         + min(repo.get("forks_count", 0) * 3, 20)
@@ -83,12 +104,17 @@ def compute_repo_score(repo: dict, days_since_push: int | None) -> int:
 
 
 def compute_profile_completeness(profile: dict) -> int:
+    """Calculates profile completeness percentage."""
     fields = ("name", "bio", "location", "blog", "company")
     completed = sum(1 for field in fields if profile.get(field))
     return round((completed / len(fields)) * 100)
 
 
+# ---------------- Analysis Engine ----------------
+
+
 def analyze_account(profile: dict, repos: list):
+    """Processes repository and profile metrics in a single efficient pass."""
     stats = {
         "stars": 0,
         "forks": 0,
@@ -101,20 +127,18 @@ def analyze_account(profile: dict, repos: list):
         "languages": {},
     }
 
-    # Attach score to repo objects directly to avoid re-computation
     for r in repos:
-        stars = r.get("stargazers_count", 0)
-        forks = r.get("forks_count", 0)
         pushed_days = calculate_days_ago(r.get("pushed_at"))
-        
+        r["_pushed_days"] = pushed_days
         r["_score"] = compute_repo_score(r, pushed_days)
 
-        stats["stars"] += stars
-        stats["forks"] += forks
+        stats["stars"] += r.get("stargazers_count", 0)
+        stats["forks"] += r.get("forks_count", 0)
         stats["issues"] += r.get("open_issues_count", 0)
 
         if not r.get("fork"):
             stats["original"] += 1
+
         if r.get("archived"):
             stats["archived"] += 1
 
@@ -131,7 +155,7 @@ def analyze_account(profile: dict, repos: list):
 
     total_repos = len(repos) or 1
     completeness = compute_profile_completeness(profile)
-    
+
     activity_score = min(stats["active30"] / total_repos * 100, 100)
     original_ratio = stats["original"] / total_repos * 100
     long_activity = min(stats["active180"] * 5, 100)
@@ -153,20 +177,21 @@ def analyze_account(profile: dict, repos: list):
         + stats["forks"] * 15
         + stats["active30"] * 30
     )
-    level = xp // 250 + 1
 
     return {
         "stats": stats,
         "completeness": completeness,
         "score": overall_score,
         "xp": xp,
-        "level": level,
+        "level": xp // 250 + 1,
     }
 
 
-# ---------------- CLI Display ----------------
+# ---------------- Presentation ----------------
 
-def print_dashboard(profile: dict, repos: list, metrics: dict):
+
+def display_dashboard(profile: dict, repos: list, metrics: dict):
+    """Outputs the formatted CLI dashboard."""
     s = metrics["stats"]
     print("\n" + "=" * 50)
     print("             GITRANK v1.1")
@@ -183,18 +208,21 @@ def print_dashboard(profile: dict, repos: list, metrics: dict):
     print(f"🔥 Active (30d): {s['active30']} | 📅 Active (180d): {s['active180']}")
     print(f"💡 Original: {s['original']} | 💤 Stale: {s['stale']}")
 
-    print("\n💻 LANGUAGES")
-    sorted_langs = sorted(s["languages"].items(), key=lambda x: x[1], reverse=True)
-    for lang, count in sorted_langs:
-        print(f"  • {lang}: {count}")
+    if s["languages"]:
+        print("\n💻 LANGUAGES")
+        sorted_langs = sorted(s["languages"].items(), key=lambda x: x[1], reverse=True)
+        for lang, count in sorted_langs:
+            print(f"  • {lang}: {count}")
 
     sorted_repos = sorted(repos, key=lambda x: x["_score"], reverse=True)
 
-    print("\n🏆 TOP PROJECTS")
-    for i, r in enumerate(sorted_repos[:5], 1):
-        print(f"{i}. {r['name']} ({r['_score']}/100) ⭐ {r.get('stargazers_count', 0)}")
-
     if sorted_repos:
+        print("\n🏆 TOP PROJECTS")
+        for i, r in enumerate(sorted_repos[:5], 1):
+            print(
+                f"{i}. {r['name']} ({r['_score']}/100) ⭐ {r.get('stargazers_count', 0)}"
+            )
+
         best = sorted_repos[0]
         print(f"\n🥇 BEST PROJECT\n{best['name']}\n{best.get('html_url', '')}")
 
@@ -202,7 +230,8 @@ def print_dashboard(profile: dict, repos: list, metrics: dict):
     print(f"\n🎮 DEVELOPER LEVEL\nLevel {metrics['level']} • {metrics['xp']} XP")
 
 
-def handle_search_mode(repos: list):
+def handle_search(repos: list):
+    """Interactive loop to filter repositories."""
     while True:
         choice = input("\nSearch repositories? (y/n): ").strip().lower()
         if choice != "y":
@@ -220,10 +249,13 @@ def handle_search_mode(repos: list):
         matches.sort(key=lambda x: x["_score"], reverse=True)
         print("\nSearch Results:")
         for r in matches:
-            print(f"  • {r['name']} | Score: {r['_score']}/100 | ⭐ {r.get('stargazers_count', 0)}")
+            print(
+                f"  • {r['name']} | Score: {r['_score']}/100 | ⭐ {r.get('stargazers_count', 0)}"
+            )
 
 
-# ---------------- Entry Point ----------------
+# ---------------- Main Execution ----------------
+
 
 def main():
     username = input("GitHub username: ").strip()
@@ -241,8 +273,8 @@ def main():
         return
 
     metrics = analyze_account(profile, repos)
-    print_dashboard(profile, repos, metrics)
-    handle_search_mode(repos)
+    display_dashboard(profile, repos, metrics)
+    handle_search(repos)
 
     print("\n✅ GitRank analysis complete.")
 
