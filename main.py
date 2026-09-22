@@ -17,14 +17,23 @@ if TOKEN:
 
 def get(url, params=None):
     try:
-        r = requests.get(url, headers=HEADERS, params=params, timeout=10)
+        r = requests.get(
+            url,
+            headers=HEADERS,
+            params=params,
+            timeout=10
+        )
 
         if r.status_code == 200:
             return r.json()
+
         if r.status_code == 404:
             print("❌ GitHub user not found.")
+
         elif r.status_code == 403:
-            print("❌ GitHub API rate limit/permission error.")
+            print("❌ GitHub API rate limit or permission error.")
+            print(f"   {r.json().get('message', 'Unknown error')}")
+
         else:
             print(f"❌ API error: {r.status_code}")
 
@@ -34,14 +43,16 @@ def get(url, params=None):
     return None
 
 
-def days_ago(text):
-    if not text:
+def days_ago(date_text):
+    if not date_text:
         return None
 
     try:
-        date = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        date = datetime.fromisoformat(
+            date_text.replace("Z", "+00:00")
+        )
         return (datetime.now(timezone.utc) - date).days
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -56,7 +67,11 @@ def get_repos(username):
     while True:
         data = get(
             f"{API}/users/{username}/repos",
-            {"per_page": 100, "page": page, "sort": "updated"}
+            {
+                "per_page": 100,
+                "page": page,
+                "sort": "updated"
+            }
         )
 
         if data is None:
@@ -88,6 +103,8 @@ def analyze(repos):
     for repo in repos:
         stats["stars"] += repo.get("stargazers_count", 0)
         stats["forks"] += repo.get("forks_count", 0)
+
+        # GitHub counts open PRs in open_issues_count too.
         stats["issues"] += repo.get("open_issues_count", 0)
 
         if not repo.get("fork"):
@@ -101,8 +118,10 @@ def analyze(repos):
         if days is not None:
             if days <= 30:
                 stats["active30"] += 1
+
             if days <= 180:
                 stats["active180"] += 1
+
             if days > 180 and not repo.get("archived"):
                 stats["stale"] += 1
 
@@ -125,8 +144,10 @@ def repo_score(repo):
     if repo.get("description"):
         score += 10
 
-    if repo.get("topics"):
-        score += min(len(repo["topics"]) * 2, 10)
+    topics = repo.get("topics", [])
+
+    if topics:
+        score += min(len(topics) * 2, 10)
 
     if repo.get("license"):
         score += 5
@@ -162,143 +183,36 @@ def completeness(profile):
         profile.get("company")
     ]
 
-    return round(sum(bool(x) for x in fields) / len(fields) * 100)
+    return round(
+        sum(bool(field) for field in fields)
+        / len(fields)
+        * 100
+    )
 
 
 def portfolio_score(profile, stats, total_repos):
-    if not total_repos:
+    if total_repos == 0:
         return 0
 
-    activity = min(stats["active30"] / total_repos * 100, 100)
-    original = stats["original"] / total_repos * 100
-    long_activity = min(stats["active180"] * 5, 100)
+    activity = min(
+        stats["active30"] / total_repos * 100,
+        100
+    )
 
-    return round(
+    original = (
+        stats["original"] / total_repos * 100
+    )
+
+    long_activity = min(
+        stats["active180"] * 5,
+        100
+    )
+
+    stars = min(stats["stars"], 100)
+    followers = min(profile.get("followers", 0), 100)
+
+    score = (
         completeness(profile) * 0.20 +
         activity * 0.20 +
         original * 0.20 +
-        long_activity * 0.20 +
-        min(stats["stars"], 100) * 0.10 +
-        min(profile.get("followers", 0), 100) * 0.10,
-        1
-    )
-
-
-def show(profile, repos, stats):
-    print("\n" + "=" * 50)
-    print("              GITRANK v1.1")
-    print("=" * 50)
-
-    print(f"\n👤 {profile.get('name') or profile['login']}")
-    print(f"Bio: {profile.get('bio') or 'None'}")
-    print(f"Followers: {profile.get('followers', 0)}")
-    print(f"Repositories: {len(repos)}")
-    print(f"Profile: {completeness(profile)}%")
-
-    print("\n📊 STATISTICS")
-    print(f"⭐ Stars: {stats['stars']}")
-    print(f"🍴 Forks: {stats['forks']}")
-    print(f"🐛 Issues: {stats['issues']}")
-    print(f"🔥 Active 30d: {stats['active30']}")
-    print(f"📅 Active 180d: {stats['active180']}")
-    print(f"💡 Original: {stats['original']}")
-    print(f"💤 Stale: {stats['stale']}")
-
-    print("\n💻 LANGUAGES")
-
-    for language, count in sorted(
-        stats["languages"].items(),
-        key=lambda x: x[1],
-        reverse=True
-    ):
-        print(f"  {language}: {count}")
-
-    print("\n🏆 TOP PROJECTS")
-
-    top = sorted(repos, key=repo_score, reverse=True)[:5]
-
-    for i, repo in enumerate(top, 1):
-        print(
-            f"{i}. {repo['name']} "
-            f"({repo_score(repo)}/100) "
-            f"⭐{repo.get('stargazers_count', 0)}"
-        )
-
-    if repos:
-        best = max(repos, key=repo_score)
-
-        print("\n🥇 BEST PROJECT")
-        print(best["name"])
-        print(best.get("html_url", ""))
-
-    score = portfolio_score(profile, stats, len(repos))
-
-    print("\n🎯 GITRANK SCORE")
-    print(f"{score}/100")
-
-    xp = (
-        len(repos) * 25 +
-        stats["original"] * 15 +
-        stats["stars"] * 10 +
-        stats["forks"] * 15 +
-        stats["active30"] * 30
-    )
-
-    print("\n🎮 DEVELOPER LEVEL")
-    print(f"Level {xp // 250 + 1} • {xp} XP")
-
-
-def search_repos(repos):
-    query = input("\nSearch repository: ").strip().lower()
-
-    if not query:
-        return
-
-    found = [
-        repo for repo in repos
-        if query in repo["name"].lower()
-    ]
-
-    if not found:
-        print("No results.")
-        return
-
-    for repo in sorted(found, key=repo_score, reverse=True):
-        print(
-            f"{repo['name']} | "
-            f"{repo_score(repo)}/100 | "
-            f"⭐{repo.get('stargazers_count', 0)}"
-        )
-
-
-def main():
-    username = input("GitHub username: ").strip()
-
-    if not username:
-        print("❌ Username required.")
-        return
-
-    print("\n🔎 Analyzing GitHub...")
-
-    profile = get_profile(username)
-
-    if not profile:
-        return
-
-    repos = get_repos(username)
-
-    if repos is None:
-        return
-
-    stats = analyze(repos)
-
-    show(profile, repos, stats)
-
-    while input("\nSearch repositories? (y/n): ").lower().strip() == "y":
-        search_repos(repos)
-
-    print("\n✅ GitRank analysis complete.")
-
-
-if __name__ == "__main__":
-    main()
+        long_activity * 0.20
