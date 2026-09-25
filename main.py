@@ -53,6 +53,33 @@ def days_ago(date_text):
         return None
 
 
+def format_date(date_text):
+    if not date_text:
+        return "Unknown"
+
+    try:
+        date = datetime.fromisoformat(
+            date_text.replace("Z", "+00:00")
+        )
+        return date.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return "Unknown"
+
+
+def activity_status(repo):
+    days = days_ago(repo.get("pushed_at"))
+
+    if days is None:
+        return "Unknown"
+
+    if days <= 30:
+        return "🟢 Active"
+    if days <= 180:
+        return "🟡 Recent"
+
+    return "🔴 Stale"
+
+
 def account_age(date_text):
     days = days_ago(date_text)
 
@@ -154,10 +181,8 @@ def repo_score(repo):
     if repo.get("description"):
         score += 10
 
-    topics = repo.get("topics", [])
-
-    if topics:
-        score += min(len(topics) * 2, 10)
+    if repo.get("topics"):
+        score += min(len(repo["topics"]) * 2, 10)
 
     if repo.get("license"):
         score += 5
@@ -226,11 +251,7 @@ def portfolio_score(profile, stats, total_repos):
         total_repos
     )
 
-    stars = normalize(
-        stats["stars"],
-        100
-    )
-
+    stars = normalize(stats["stars"], 100)
     followers = normalize(
         profile.get("followers", 0),
         100
@@ -246,6 +267,62 @@ def portfolio_score(profile, stats, total_repos):
     )
 
     return round(min(score, 100), 1)
+
+
+def score_breakdown(profile, stats, total_repos):
+    if total_repos == 0:
+        return {}
+
+    return {
+        "Profile": completeness(profile) * 0.20,
+        "Recent activity": normalize(
+            stats["active30"],
+            total_repos
+        ) * 0.20,
+        "Original repositories": normalize(
+            stats["original"],
+            total_repos
+        ) * 0.20,
+        "6-month activity": normalize(
+            stats["active180"],
+            total_repos
+        ) * 0.15,
+        "Stars": normalize(
+            stats["stars"],
+            100
+        ) * 0.15,
+        "Followers": normalize(
+            profile.get("followers", 0),
+            100
+        ) * 0.10
+    }
+
+
+def achievements(profile, repos, stats):
+    badges = []
+
+    if stats["original"] > 0:
+        badges.append("🏗️ Original Builder")
+
+    if stats["active30"] > 0:
+        badges.append("🔥 Active Developer")
+
+    if stats["stars"] >= 10:
+        badges.append("⭐ Star Collector")
+
+    if stats["forks"] > 0:
+        badges.append("🍴 Open Source")
+
+    if profile.get("followers", 0) >= 10:
+        badges.append("👥 Community")
+
+    if len(repos) >= 10:
+        badges.append("📚 Project Builder")
+
+    if stats["languages"]:
+        badges.append("💻 Multi-Language")
+
+    return badges
 
 
 def most_used_language(stats):
@@ -268,10 +345,36 @@ def calculate_xp(repos, stats):
     )
 
 
+def show_repo(repo, number=None):
+    prefix = f"{number}. " if number else ""
+
+    print(
+        f"{prefix}{repo['name']} "
+        f"({repo_score(repo)}/100)"
+    )
+
+    print(f"   {activity_status(repo)}")
+    print(f"   ⭐ {repo.get('stargazers_count', 0)}")
+    print(f"   Updated: {format_date(repo.get('pushed_at'))}")
+
+    if repo.get("language"):
+        print(f"   Language: {repo['language']}")
+
+    if repo.get("description"):
+        print(f"   {repo['description']}")
+
+    topics = repo.get("topics", [])
+
+    if topics:
+        print(f"   Topics: {', '.join(topics[:5])}")
+
+    print(f"   {repo.get('html_url', '')}")
+
+
 def show(profile, repos, stats):
-    print("\n" + "=" * 52)
-    print("                 GITRANK v1.2")
-    print("=" * 52)
+    print("\n" + "=" * 55)
+    print("                  GITRANK v1.3")
+    print("=" * 55)
 
     username = profile.get("login", "Unknown")
     name = profile.get("name") or username
@@ -318,35 +421,20 @@ def show(profile, repos, stats):
 
     if top:
         for i, repo in enumerate(top, 1):
-            print(
-                f"{i}. {repo['name']} "
-                f"({repo_score(repo)}/100) "
-                f"⭐{repo.get('stargazers_count', 0)}"
-            )
+            show_repo(repo, i)
     else:
         print("No repositories.")
 
     if repos:
-        best = max(repos, key=repo_score)
+        recent = max(
+            repos,
+            key=lambda r: r.get("pushed_at") or ""
+        )
 
-        print("\n🥇 TOP PROJECT")
-        print(f"Name: {best['name']}")
-        print(f"Score: {repo_score(best)}/100")
-        print(f"URL: {best.get('html_url', '')}")
+        print("\n🟢 MOST RECENTLY UPDATED")
+        show_repo(recent)
 
-        if best.get("description"):
-            print(f"About: {best['description']}")
-
-    recent = sorted(
-        repos,
-        key=lambda r: r.get("pushed_at") or "",
-        reverse=True
-    )
-
-    if recent:
-        print("\n🟢 RECENTLY UPDATED")
-        print(recent[0]["name"])
-        print(recent[0].get("html_url", ""))
+    print("\n🎯 GITRANK SCORE")
 
     score = portfolio_score(
         profile,
@@ -354,8 +442,32 @@ def show(profile, repos, stats):
         len(repos)
     )
 
-    print("\n🎯 GITRANK SCORE")
     print(f"{score}/100")
+
+    print("\n📈 SCORE BREAKDOWN")
+
+    breakdown = score_breakdown(
+        profile,
+        stats,
+        len(repos)
+    )
+
+    for name, value in breakdown.items():
+        print(f"  {name}: {value:.1f}")
+
+    print("\n🏅 ACHIEVEMENTS")
+
+    badges = achievements(
+        profile,
+        repos,
+        stats
+    )
+
+    if badges:
+        for badge in badges:
+            print(f"  {badge}")
+    else:
+        print("  Keep building to unlock badges.")
 
     xp = calculate_xp(repos, stats)
     level = xp // 250 + 1
@@ -366,7 +478,7 @@ def show(profile, repos, stats):
 
 def search_repos(repos):
     query = input(
-        "\nSearch repository: "
+        "\nSearch name, description, language or topic: "
     ).strip().lower()
 
     if not query:
@@ -383,10 +495,16 @@ def search_repos(repos):
             repo.get("language") or ""
         ).lower()
 
+        topics = [
+            topic.lower()
+            for topic in repo.get("topics", [])
+        ]
+
         if (
             query in name
             or query in description
             or query in language
+            or query in topics
         ):
             found.append(repo)
 
@@ -394,18 +512,14 @@ def search_repos(repos):
         print("❌ No results.")
         return
 
-    print("\n🔎 RESULTS")
+    print(f"\n🔎 {len(found)} RESULT(S)")
 
     for repo in sorted(
         found,
         key=repo_score,
         reverse=True
     ):
-        print(
-            f"{repo['name']} | "
-            f"{repo_score(repo)}/100 | "
-            f"⭐{repo.get('stargazers_count', 0)}"
-        )
+        show_repo(repo)
 
 
 def export_report(profile, repos, stats):
@@ -421,8 +535,8 @@ def export_report(profile, repos, stats):
     filename = f"{username}_gitrank.txt"
 
     with open(filename, "w", encoding="utf-8") as file:
-        file.write("GITRANK v1.2\n")
-        file.write("=" * 40 + "\n\n")
+        file.write("GITRANK v1.3\n")
+        file.write("=" * 45 + "\n\n")
 
         file.write(f"User: {username}\n")
         file.write(
@@ -447,7 +561,7 @@ def export_report(profile, repos, stats):
         )
 
         file.write("\nREPOSITORY METRICS\n")
-        file.write("-" * 40 + "\n")
+        file.write("-" * 45 + "\n")
         file.write(f"Total Stars: {stats['stars']}\n")
         file.write(f"Total Forks: {stats['forks']}\n")
         file.write(
@@ -473,14 +587,37 @@ def export_report(profile, repos, stats):
             f"{most_used_language(stats)}\n"
         )
 
-        file.write("\nGITRANK\n")
-        file.write("-" * 40 + "\n")
+        file.write("\nGITRANK SCORE\n")
+        file.write("-" * 45 + "\n")
         file.write(f"Score: {score}/100\n")
+
+        file.write("\nSCORE BREAKDOWN\n")
+        file.write("-" * 45 + "\n")
+
+        for name, value in score_breakdown(
+            profile,
+            stats,
+            len(repos)
+        ).items():
+            file.write(f"{name}: {value:.1f}\n")
+
+        file.write("\nACHIEVEMENTS\n")
+        file.write("-" * 45 + "\n")
+
+        for badge in achievements(
+            profile,
+            repos,
+            stats
+        ):
+            file.write(f"{badge}\n")
+
+        file.write("\nDEVELOPER LEVEL\n")
+        file.write("-" * 45 + "\n")
         file.write(f"Level: {xp // 250 + 1}\n")
         file.write(f"XP: {xp}\n")
 
         file.write("\nTOP PROJECTS\n")
-        file.write("-" * 40 + "\n")
+        file.write("-" * 45 + "\n")
 
         for repo in sorted(
             repos,
@@ -490,6 +627,9 @@ def export_report(profile, repos, stats):
             file.write(
                 f"{repo['name']} - "
                 f"{repo_score(repo)}/100\n"
+            )
+            file.write(
+                f"{repo.get('html_url', '')}\n"
             )
 
     print(f"\n💾 Report saved as: {filename}")
