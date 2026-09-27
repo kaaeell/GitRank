@@ -1,3 +1,4 @@
+```python
 def activity_status(repo):
     if repo.get("archived"):
         return "📦 Archived"
@@ -20,15 +21,31 @@ def score_breakdown(profile, stats, total_repos):
 
     metrics = [
         ("Profile", completeness(profile), 0.20),
-        ("Recent activity",
-         normalize(stats["active30"], total_repos), 0.20),
-        ("Original repositories",
-         normalize(stats["original"], total_repos), 0.20),
-        ("6-month activity",
-         normalize(stats["active180"], total_repos), 0.15),
-        ("Stars", normalize(stats["stars"], 100), 0.15),
-        ("Followers",
-         normalize(profile.get("followers", 0), 100), 0.10)
+        (
+            "Recent activity",
+            normalize(stats["active30"], total_repos),
+            0.20
+        ),
+        (
+            "Original repositories",
+            normalize(stats["original"], total_repos),
+            0.20
+        ),
+        (
+            "6-month activity",
+            normalize(stats["active180"], total_repos),
+            0.15
+        ),
+        (
+            "Stars",
+            normalize(stats["stars"], 100),
+            0.15
+        ),
+        (
+            "Followers",
+            normalize(profile.get("followers", 0), 100),
+            0.10
+        )
     ]
 
     return {
@@ -55,9 +72,10 @@ def search_repos(repos):
         name = (repo.get("name") or "").lower()
         description = (repo.get("description") or "").lower()
         language = (repo.get("language") or "").lower()
+
         topics = [
             topic.lower()
-            for topic in repo.get("topics", [])
+            for topic in (repo.get("topics") or [])
         ]
 
         if (
@@ -94,7 +112,9 @@ def show_repo(repo, number=None):
         print(f"   {repo['description']}")
 
     topics = repo.get("topics") or []
+
     if topics:
         print(f"   Topics: {', '.join(topics[:5])}")
 
     print(f"   {repo.get('html_url') or 'No URL available'}")
+```
